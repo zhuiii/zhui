@@ -5,10 +5,12 @@
   var AMOUNT_ERROR = "请输入 1 到 3000 之间的整数毫升。";
   var SVG_NS = "http://www.w3.org/2000/svg";
 
+  var THEME_KEY = "zhui.water.theme";
   var state = Z.defaultState();
   var statRange = "day";
   var flashId = null;
   var shownDay = "";
+  var theme = "light";
   var dom = {};
   var tabs = [];
 
@@ -195,8 +197,52 @@
     var total = Z.scheduleTotal(state.schedule);
     dom.planTotal.textContent =
       state.schedule.length === 0
-        ? "方案里还没有时间点，今日计划暂按 " + Z.formatMl(state.targetMl) + " 计算。"
-        : "方案合计 " + Z.formatMl(total) + "，也就是每天的计划。";
+        ? "方案里还没有时间点。今日计划 " + Z.formatMl(state.targetMl) + "。"
+        : "方案合计 " + Z.formatMl(total) + "（仅用于提醒）。今日计划 " + Z.formatMl(state.targetMl) + "。";
+  }
+
+  function renderTarget() {
+    if (document.activeElement !== dom.targetMl) {
+      dom.targetMl.value = String(state.targetMl);
+    }
+  }
+
+  function saveTarget() {
+    var parsed = Z.parseTarget(dom.targetMl.value);
+    if (!parsed.ok) {
+      dom.targetError.textContent = "计划喝水量请填 100 到 10000 的整数。";
+      dom.targetMl.setAttribute("aria-invalid", "true");
+      return;
+    }
+    dom.targetError.textContent = "";
+    dom.targetMl.removeAttribute("aria-invalid");
+    if (parsed.ml === state.targetMl) return;
+    update({ targetMl: parsed.ml });
+    save();
+    renderPlanTotal();
+    renderProgressAndList();
+    announce("计划喝水量已设为 " + Z.formatMl(parsed.ml) + "。");
+  }
+
+  function currentTheme() {
+    return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+  }
+
+  function applyTheme(next) {
+    theme = next === "dark" ? "dark" : "light";
+    document.documentElement.dataset.theme = theme;
+    try {
+      window.localStorage.setItem(THEME_KEY, theme);
+    } catch (error) {
+      /* theme still applies for this session */
+    }
+    var dark = theme === "dark";
+    dom.themeToggle.setAttribute("aria-pressed", dark ? "true" : "false");
+    dom.themeToggle.textContent = dark ? "浅色" : "深色";
+  }
+
+  function toggleTheme() {
+    applyTheme(currentTheme() === "dark" ? "light" : "dark");
   }
 
   function makeInput(className, type, label, attrs) {
@@ -215,11 +261,8 @@
     item.className = "slot";
     item.dataset.id = slot.id;
 
-    var time = makeInput("s-time", "text", "提醒时间（24 小时制）", {
-      inputmode: "numeric",
-      maxlength: "5",
-      placeholder: "13:30",
-      autocomplete: "off",
+    var time = makeInput("s-time", "time", "提醒时间", {
+      step: "60",
     });
     time.value = slot.time;
     var ml = makeInput("s-ml", "number", "毫升", { min: "1", max: "3000", step: "1", inputmode: "numeric" });
@@ -315,7 +358,7 @@
         bad.setAttribute("aria-invalid", "true");
         if (!problem) {
           problem =
-            "第 " + (index + 1) + " 行" + (parsed.field === "time" ? "的时间请按 24 小时制填写，例如 13:30。" : "的毫升请填 1 到 3000 的整数。");
+            "第 " + (index + 1) + " 行" + (parsed.field === "time" ? "请选择有效时间。" : "的毫升请填 1 到 3000 的整数。");
         }
         return;
       }
@@ -345,9 +388,19 @@
         }),
       };
     }
-    update({ schedule: list, reminder: reminder });
+    var sorted = Z.sortSchedule(list);
+    var orderChanged =
+      sorted.length !== state.schedule.length ||
+      sorted.some(function (slot, index) {
+        return !state.schedule[index] || state.schedule[index].id !== slot.id;
+      });
+    update({ schedule: sorted, reminder: reminder });
     save();
-    renderPlanTotal();
+    if (orderChanged || movedIds.length) renderSchedule();
+    else {
+      renderPlanTotal();
+      updateSlotStatuses(Date.now());
+    }
     renderProgressAndList();
     updateNext(Date.now());
   }
@@ -427,7 +480,7 @@
     if (shownDay && day !== shownDay) {
       shownDay = day;
       renderProgressAndList();
-      announce("已经进入新的一天（上海时间）。今日记录已更新。");
+      announce("已经进入新的一天。今日记录已更新。");
     } else if (!shownDay) {
       shownDay = day;
     }
@@ -514,7 +567,10 @@
       item.tab.tabIndex = active ? 0 : -1;
       item.panel.hidden = !active;
     });
-    if (name === "plan") renderSchedule();
+    if (name === "plan") {
+      renderTarget();
+      renderSchedule();
+    }
     if (name === "stats") renderStats();
   }
 
@@ -636,7 +692,7 @@
         tile("完成度", (target > 0 ? Math.round((summary.totalMl / target) * 100) : 0) + "%"),
         tile("今日杯数", summary.today.length + " 杯"),
       ];
-      dom.statCaption.textContent = "今天每个小时喝了多少（上海时间）";
+      dom.statCaption.textContent = "今天每个小时喝了多少";
       opts = { target: null, labelEvery: 3, valueLabels: false, label: "今日按小时的饮水量柱状图" };
       hasData = summary.totalMl > 0;
       note = hasData ? "柱子高度是那个小时喝的毫升数。" : "今天还没有记录。";
@@ -671,7 +727,7 @@
       };
       hasData = stats.totalMl > 0;
       note = hasData
-        ? "虚线是每日计划（来自喝水方案），绿色柱子表示当天达标。日均按已过去的天数算。"
+        ? "虚线是每日计划喝水量，绿色柱子表示当天达标。日均按已过去的天数算。"
         : "这段时间还没有记录。";
     }
     dom.statTiles.replaceChildren.apply(dom.statTiles, tiles);
@@ -692,10 +748,9 @@
     dom.amount.addEventListener("input", clearFormError);
 
     dom.reminderToggle.addEventListener("click", toggleReminder);
-    dom.editPlan.addEventListener("click", function () {
-      selectTab("plan");
-      dom.tabPlan.focus();
-    });
+    dom.themeToggle.addEventListener("click", toggleTheme);
+    dom.targetMl.addEventListener("change", saveTarget);
+    dom.targetMl.addEventListener("blur", saveTarget);
     tabs.forEach(function (item, index) {
       item.tab.addEventListener("click", function () {
         selectTab(item.name);
@@ -786,7 +841,7 @@
       planLine: $("plan-line"),
       nextLabel: $("next-label"),
       notifyStatus: $("notify-status"),
-      editPlan: $("edit-plan"),
+      themeToggle: $("theme-toggle"),
       tabLog: $("tab-log"),
       tabPlan: $("tab-plan"),
       tabStats: $("tab-stats"),
@@ -807,6 +862,8 @@
       logList: $("log-list"),
       slotList: $("slot-list"),
       slotError: $("slot-error"),
+      targetMl: $("target-ml"),
+      targetError: $("target-error"),
       planTotal: $("plan-total"),
       addSlot: $("add-slot"),
       resetPlan: $("reset-plan"),
@@ -817,8 +874,15 @@
       { name: "stats", tab: dom.tabStats, panel: dom.panelStats },
     ];
     bind();
+    try {
+      theme = window.localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
+    } catch (error) {
+      theme = "light";
+    }
+    applyTheme(theme);
     shownDay = Z.shanghaiDayKey(Date.now());
     renderReminderSettings();
+    renderTarget();
     renderSchedule();
     renderProgressAndList();
     tick();

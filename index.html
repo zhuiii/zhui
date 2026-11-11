@@ -5,19 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>饮水记录</title>
     <meta name="description" content="在电脑上记录今天喝了多少水，按你自己定的喝水方案在指定时间提醒。" />
-    <meta name="color-scheme" content="light" />
+    <meta name="color-scheme" content="light dark" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23155e73'/%3E%3Cpath d='M10 8h12l-1.5 13.6A4.2 4.2 0 0 1 16.3 26h-.6a4.2 4.2 0 0 1-4.2-4.4z' fill='%23dff6f8'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="styles.css" />
+    <script>
+      (function () {
+        try {
+          var theme = localStorage.getItem("zhui.water.theme");
+          if (theme === "dark" || theme === "light") document.documentElement.dataset.theme = theme;
+        } catch (error) {}
+      })();
+    </script>
   </head>
   <body>
     <div class="shell">
       <main class="desk">
         <header class="titlebar">
           <div>
-            <p class="eyebrow">桌面小应用</p>
             <h1>饮水记录</h1>
           </div>
-          <p class="clock" id="clock">上海时间</p>
+          <div class="titlebar-end">
+            <button type="button" class="btn ghost small theme-toggle" id="theme-toggle" aria-pressed="false">深色</button>
+            <p class="clock" id="clock"></p>
+          </div>
         </header>
 
         <div id="banner" class="banner" hidden>
@@ -74,7 +84,6 @@
               <p class="next-time is-idle" id="next-time">--:--</p>
               <p class="next-label" id="next-label"></p>
               <p class="hint" id="notify-status"></p>
-              <button type="button" class="btn ghost small" id="edit-plan">编辑喝水方案</button>
             </section>
           </section>
 
@@ -92,10 +101,10 @@
                   <p>点一下就按现在的时间记下。</p>
                 </div>
                 <div class="quick" id="quick-add" role="group" aria-label="常用分量">
+                  <button type="button" data-ml="100"><strong>100</strong><span>毫升</span></button>
                   <button type="button" data-ml="200"><strong>200</strong><span>毫升</span></button>
                   <button type="button" data-ml="300"><strong>300</strong><span>毫升</span></button>
                   <button type="button" data-ml="400"><strong>400</strong><span>毫升</span></button>
-                  <button type="button" data-ml="500"><strong>500</strong><span>毫升</span></button>
                 </div>
                 <div class="custom-row">
                   <label class="field">
@@ -121,9 +130,16 @@
               <div class="section-head split">
                 <div>
                   <h2>喝水方案</h2>
-                  <p>每个时间点到了就提醒你，需要先打开左侧的提醒开关。时间按 24 小时制填写，改动会自动保存。</p>
+                  <p>每个时间点到了就提醒你，需要先打开左侧的提醒开关。改动会自动保存。计划喝水量单独设置，与方案合计无关。</p>
                 </div>
                 <button type="button" class="btn ghost small" id="reset-plan">恢复默认方案</button>
+              </div>
+              <div class="target-row">
+                <label class="field target-field">
+                  <span>计划喝水量（毫升）</span>
+                  <input id="target-ml" name="target" type="number" inputmode="numeric" min="100" max="10000" step="50" required />
+                </label>
+                <p class="hint error" id="target-error" role="alert"></p>
               </div>
               <p class="hint error" id="slot-error" role="alert"></p>
               <ul class="slot-list" id="slot-list"></ul>
@@ -152,7 +168,7 @@
           </section>
         </div>
 
-        <footer class="foot">数据只保存在这台浏览器里。今日从上海时间 0 点起算。提醒需要保持这个页面开着。</footer>
+        <footer class="foot">数据只保存在这台浏览器里。今日从 0 点起算。提醒需要保持这个页面开着。</footer>
       </main>
     </div>
     <noscript>

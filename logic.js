@@ -113,7 +113,7 @@
       if (part.type !== "literal") parts[part.type] = part.value;
     });
     if (parts.hour === "24") parts.hour = "00";
-    return parts.month + "月" + parts.day + "日 " + parts.weekday + " " + parts.hour + ":" + parts.minute + " · 上海";
+    return parts.month + "月" + parts.day + "日 " + parts.weekday + " " + parts.hour + ":" + parts.minute;
   }
 
   function formatShanghaiTime(ms) {
@@ -153,7 +153,7 @@
 
   function parseClockTime(value) {
     var text = String(value == null ? "" : value).trim().replace(/[：.]/g, ":");
-    var match = /^(\d{1,2}):(\d{2})$/.exec(text) || /^(\d{2})(\d{2})$/.exec(text);
+    var match = /^(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/.exec(text) || /^(\d{2})(\d{2})$/.exec(text);
     if (!match) return { ok: false };
     var hour = Number(match[1]);
     var minute = Number(match[2]);
@@ -285,8 +285,7 @@
   }
 
   function dailyTarget(state) {
-    var total = scheduleTotal(state.schedule);
-    return total > 0 ? total : state.targetMl;
+    return state.targetMl;
   }
 
   function addDays(dayKey, n) {

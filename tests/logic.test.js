@@ -32,7 +32,7 @@ test("Shanghai midnight splits the drinking day", () => {
   assert.equal(logic.shanghaiInputToMs("2026-11-09T00:00"), midnight);
   assert.equal(logic.msToShanghaiInput(midnight), "2026-11-09T00:00");
   assert.equal(logic.formatShanghaiTime(midnight), "00:00");
-  assert.match(logic.formatShanghaiClock(midnight), /11月9日 星期一 00:00 · 上海/);
+  assert.match(logic.formatShanghaiClock(midnight), /11月9日 星期一 00:00$/);
 });
 
 test("invalid wall times are rejected", () => {
@@ -90,6 +90,8 @@ test("amounts, targets, and clock times stay in range", () => {
   assert.equal(logic.parseClockTime("9:05").time, "09:05");
   assert.equal(logic.parseClockTime("1330").time, "13:30");
   assert.equal(logic.parseClockTime("13：30").time, "13:30");
+  assert.equal(logic.parseClockTime("10:00:00").time, "10:00");
+  assert.equal(logic.parseClockTime("13:30:00").time, "13:30");
   assert.equal(logic.parseClockTime("8am").ok, false);
   assert.equal(logic.parseClockTime("").ok, false);
 });
@@ -108,6 +110,18 @@ test("default plan is the 5-slot schedule totalling 1600 ml", () => {
   );
   assert.equal(logic.scheduleTotal(state.schedule), 1600);
   assert.equal(state.targetMl, 1600);
+});
+
+test("daily target is independent from schedule total", () => {
+  const state = logic.withState(logic.defaultState(), {
+    targetMl: 2000,
+    schedule: [{ id: "a", time: "10:00", ml: 300, label: "一杯", note: "" }],
+  });
+  assert.equal(logic.scheduleTotal(state.schedule), 300);
+  assert.equal(logic.dailyTarget(state), 2000);
+
+  const empty = logic.withState(logic.defaultState(), { targetMl: 1800, schedule: [] });
+  assert.equal(logic.dailyTarget(empty), 1800);
 });
 
 test("slot validation reports the bad field and fills defaults", () => {
