@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>饮水记录</title>
+    <meta name="description" content="在电脑上记录今天喝了多少水，按你自己定的喝水方案在指定时间提醒。" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23155e73'/%3E%3Cpath d='M10 8h12l-1.5 13.6A4.2 4.2 0 0 1 16.3 26h-.6a4.2 4.2 0 0 1-4.2-4.4z' fill='%23dff6f8'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="styles.css" />
+    <script>
+      (function () {
+        try {
+          var theme = localStorage.getItem("zhui.water.theme");
+          if (theme === "dark" || theme === "light") document.documentElement.dataset.theme = theme;
+        } catch (error) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div class="shell">
+      <main class="desk">
+        <header class="titlebar">
+          <div>
+            <h1>饮水记录</h1>
+          </div>
+          <div class="titlebar-end">
+            <button type="button" class="btn ghost small theme-toggle" id="theme-toggle" aria-pressed="false">深色</button>
+            <p class="clock" id="clock"></p>
+          </div>
+        </header>
+
+        <div id="banner" class="banner" hidden>
+          <div class="banner-body" id="banner-body" role="status"></div>
+          <div class="banner-actions" id="banner-actions"></div>
+        </div>
+
+        <div class="layout">
+          <section class="side" aria-label="今日进度与提醒">
+            <div class="summary">
+              <div class="vessel">
+                <svg class="glass" viewBox="0 0 200 244" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="waterFill" x1="0" x2="0" y1="1" y2="0">
+                      <stop offset="0%" stop-color="#13566c" />
+                      <stop offset="52%" stop-color="#2f8ea6" />
+                      <stop offset="100%" stop-color="#d7f6f8" />
+                    </linearGradient>
+                    <clipPath id="glassClip">
+                      <path d="M62 34h76L124 206a26 26 0 0 1-48 0L62 34z" />
+                    </clipPath>
+                  </defs>
+                  <ellipse cx="100" cy="230" rx="48" ry="7" fill="rgba(28, 60, 70, 0.08)" />
+                  <g clip-path="url(#glassClip)">
+                    <rect id="water" x="50" y="220" width="100" height="0" fill="url(#waterFill)" />
+                    <ellipse id="surface" cx="100" cy="220" rx="18" ry="5.5" fill="#f3fdff" opacity="0" />
+                  </g>
+                  <path d="M62 34h76L124 206a26 26 0 0 1-48 0L62 34z" fill="rgba(255,255,255,0.2)" stroke="#7ea8b3" stroke-width="2.5" />
+                  <path d="M76 46c2 18 2 32 0 52" fill="none" stroke="rgba(255,255,255,0.95)" stroke-width="4" stroke-linecap="round" />
+                </svg>
+              </div>
+
+              <div class="readout" id="readout">
+                <p class="total" id="total">0</p>
+                <p class="total-label">今日已喝（毫升）</p>
+                <p class="percent" id="percent">完成 0%</p>
+                <p class="remain" id="remain">还差 1,600 毫升</p>
+                <p class="plan-line" id="plan-line">今日计划 1,600 毫升</p>
+                <p class="extra" id="extra" hidden></p>
+                <p class="glass-caption" id="glass-caption">杯子还是空的</p>
+                <p class="goal-flag" id="goal-flag" hidden>今日目标已达成</p>
+              </div>
+            </div>
+
+            <section class="card" aria-labelledby="reminder-title">
+              <div class="card-head">
+                <h2 id="reminder-title">喝水提醒</h2>
+                <button type="button" id="reminder-toggle" class="switch" role="switch" aria-checked="false">
+                  <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
+                  <span id="reminder-toggle-text">已关闭</span>
+                </button>
+              </div>
+              <p class="next-title">下一次提醒</p>
+              <p class="next-time is-idle" id="next-time">--:--</p>
+              <p class="next-label" id="next-label"></p>
+              <p class="hint" id="notify-status"></p>
+            </section>
+          </section>
+
+          <section class="main" aria-label="记录与方案">
+            <div class="tabs" role="tablist" aria-label="记录与方案">
+              <button type="button" role="tab" id="tab-log" class="tab" aria-controls="panel-log" aria-selected="true">记录</button>
+              <button type="button" role="tab" id="tab-plan" class="tab" aria-controls="panel-plan" aria-selected="false" tabindex="-1">喝水方案</button>
+              <button type="button" role="tab" id="tab-stats" class="tab" aria-controls="panel-stats" aria-selected="false" tabindex="-1">统计</button>
+            </div>
+
+            <div class="panel" id="panel-log" role="tabpanel" aria-labelledby="tab-log">
+              <form id="log-form" novalidate>
+                <div class="section-head">
+                  <h2>记一杯</h2>
+                  <p>点一下就按现在的时间记下。</p>
+                </div>
+                <div class="quick" id="quick-add" role="group" aria-label="常用分量">
+                  <button type="button" data-ml="100"><strong>100</strong><span>毫升</span></button>
+                  <button type="button" data-ml="200"><strong>200</strong><span>毫升</span></button>
+                  <button type="button" data-ml="300"><strong>300</strong><span>毫升</span></button>
+                  <button type="button" data-ml="400"><strong>400</strong><span>毫升</span></button>
+                </div>
+                <div class="custom-row">
+                  <label class="field">
+                    <span>自定义毫升</span>
+                    <input id="amount" name="amount" type="number" inputmode="numeric" min="1" max="3000" step="1" placeholder="例如 350" required />
+                  </label>
+                  <button type="submit" class="btn primary">记下这一杯</button>
+                </div>
+                <p class="hint error" id="form-error" role="alert"></p>
+                <p class="toast" id="toast" role="status"></p>
+              </form>
+
+              <div class="ledger">
+                <div class="section-head split">
+                  <h2>今日记录</h2>
+                  <p class="count-pill" id="log-count">0 杯</p>
+                </div>
+                <div id="log-list" class="log-list"></div>
+              </div>
+            </div>
+
+            <div class="panel" id="panel-plan" role="tabpanel" aria-labelledby="tab-plan" hidden>
+              <div class="section-head split">
+                <div>
+                  <h2>喝水方案</h2>
+                  <p>每个时间点到了就提醒你，需要先打开左侧的提醒开关。改动会自动保存。计划喝水量单独设置，与方案合计无关。</p>
+                </div>
+                <button type="button" class="btn ghost small" id="reset-plan">恢复默认方案</button>
+              </div>
+              <div class="target-row">
+                <label class="field target-field">
+                  <span>计划喝水量（毫升）</span>
+                  <input id="target-ml" name="target" type="number" inputmode="numeric" min="100" max="10000" step="50" required />
+                </label>
+                <p class="hint error" id="target-error" role="alert"></p>
+              </div>
+              <p class="hint error" id="slot-error" role="alert"></p>
+              <ul class="slot-list" id="slot-list"></ul>
+              <div class="plan-foot">
+                <button type="button" class="btn ghost" id="add-slot">添加时间点</button>
+                <p class="plan-total" id="plan-total"></p>
+              </div>
+            </div>
+
+            <div class="panel" id="panel-stats" role="tabpanel" aria-labelledby="tab-stats" hidden>
+              <div class="section-head split">
+                <div>
+                  <h2>饮水统计</h2>
+                  <p id="stat-caption"></p>
+                </div>
+                <div class="seg" role="group" aria-label="统计范围">
+                  <button type="button" data-range="day" aria-pressed="true">日</button>
+                  <button type="button" data-range="week" aria-pressed="false">周</button>
+                  <button type="button" data-range="month" aria-pressed="false">月</button>
+                </div>
+              </div>
+              <div class="tiles" id="stat-tiles"></div>
+              <div class="chart" id="stat-chart"></div>
+              <p class="hint" id="stat-note"></p>
+            </div>
+          </section>
+        </div>
+
+        <footer class="foot">数据只保存在这台浏览器里。今日从 0 点起算。提醒需要保持这个页面开着。</footer>
+      </main>
+    </div>
+    <noscript>
+      <p class="noscript">请启用 JavaScript 后再使用饮水记录。</p>
+    </noscript>
+    <script src="logic.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
